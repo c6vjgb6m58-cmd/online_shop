@@ -1,0 +1,128 @@
+// Prisma数据库模型定义
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// 用户模型
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  username  String   @unique
+  password  String
+  role      UserRole @default(CUSTOMER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // 关联
+  orders    Order[]
+  cartItems CartItem[]
+  logs      UserLog[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  CUSTOMER
+  ADMIN
+}
+
+// 商品模型
+model Product {
+  id          String   @id @default(uuid())
+  name        String
+  description String   @db.Text
+  price       Float
+  stock       Int      @default(0)
+  image       String?
+  category    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // 关联
+  cartItems   CartItem[]
+  orderItems  OrderItem[]
+  logs        UserLog[]
+
+  @@map("products")
+}
+
+// 购物车项
+model CartItem {
+  id        String   @id @default(uuid())
+  userId    String
+  productId String
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+  @@map("cart_items")
+}
+
+// 订单模型
+model Order {
+  id            String      @id @default(uuid())
+  userId        String
+  status        OrderStatus @default(PENDING_PAYMENT)
+  totalAmount   Float
+  shippingName  String
+  shippingPhone String
+  shippingAddress String   @db.Text
+  paymentMethod String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  // 关联
+  user      User       @relation(fields: [userId], references: [id])
+  orderItems OrderItem[]
+
+  @@map("orders")
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT  // 待付款
+  PAID             // 已付款
+  SHIPPED          // 已发货
+  COMPLETED        // 已完成
+  CANCELLED        // 已取消
+}
+
+// 订单项
+model OrderItem {
+  id        String   @id @default(uuid())
+  orderId   String
+  productId String
+  quantity  Int
+  price     Float    // 下单时的价格快照
+  createdAt DateTime @default(now())
+
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id])
+
+  @@map("order_items")
+}
+
+// 用户行为日志
+model UserLog {
+  id        String   @id @default(uuid())
+  userId    String
+  action    String   // VIEW_PRODUCT, PURCHASE, etc.
+  productId String?
+  details   Json?    // 额外信息
+  createdAt DateTime @default(now())
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@map("user_logs")
+}
+
